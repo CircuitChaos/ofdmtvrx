@@ -58,8 +58,11 @@ Another example, to save incoming stream while decoding and print peak incoming 
 Here's a simple example that needs `yt-dlp` and `sox`. It uses a video created by SP5LOT to test OFDMTV reception.
 
 `yt-dlp -x --audio-format wav -o /tmp/test.wav https://www.youtube.com/watch?v=f8aWa8uixn8`
+
 `sox /tmp/test.wav -c 1 /tmp/test2.wav`
+
 `mkdir /tmp/testpictures`
+
 `ofdmtvrx -i /tmp/test.wav -o /tmp/testpictures`
 
 `sox` is used to convert channel count, and also to remove the extra chunk (LIST) added by yt-dlp / ffmpeg. My .wav decoder is very simple and doesn't handle these chunks (perhaps it could be made better one day, or decoding could be delegated to `sox` or something).
