@@ -1,10 +1,35 @@
 #include <endian.h>
 #include <cstring>
+#include <fcntl.h>
+#include <unistd.h>
 #include "wav.h"
 #include "throw.h"
 #include "log.h"
 
 Wav::Wav(const std::string &file)
+{
+	if(!file.empty()) {
+		m_fd = open(file.c_str(), O_RDONLY | O_LARGEFILE);
+		xassert(m_fd >= 0, "Could not open %s: %m", file.c_str());
+		m_close = true;
+	}
+
+	if(!readHeader()) {
+		if(m_close) {
+			close(m_fd);
+			xthrow("WAV header error");
+		}
+	}
+}
+
+Wav::~Wav()
+{
+	if(m_close) {
+		close(m_fd);
+	}
+}
+
+bool Wav::readHeader()
 {
 	struct Hdr {
 		char chunkID[4];
@@ -22,13 +47,24 @@ Wav::Wav(const std::string &file)
 		uint32_t subchunk2Size;
 	} __attribute__((packed));
 
-	if(!file.empty()) {
-		m_file = fopen(file.c_str(), "rb");
-		xassert(m_file, "Could not open %s: %m", file.c_str());
+	Hdr h;
+	const ssize_t rs(read(m_fd, &h, sizeof(h)));
+	if(rs < 0) {
+		loge("Error reading WAV header: %m");
+		return false;
 	}
 
-	Hdr h;
-	xassert(read(&h, sizeof(h)) == sizeof(h), "Could not read WAV header");
+	if(rs == 0) {
+		loge("EOF when reading WAV header");
+		return false;
+	}
+
+	if((size_t) rs != sizeof(h)) {
+		loge("WAV header truncated (got only %zd bytes, need %zu)", rs, sizeof(h));
+		return false;
+	}
+
+	// not done, as this field is unused by us
 	// h.chunkSize     = le32toh(h.chunkSize);
 	h.subchunk1Size = le32toh(h.subchunk1Size);
 	h.audioFormat   = le16toh(h.audioFormat);
@@ -37,22 +73,67 @@ Wav::Wav(const std::string &file)
 	h.byteRate      = le32toh(h.byteRate);
 	h.blockAlign    = le16toh(h.blockAlign);
 	h.bitsPerSample = le16toh(h.bitsPerSample);
+	// not done, as this field is unused by us
 	// h.subchunk2Size = le32toh(h.subchunk2Size);
 
-	xassert(!memcmp(h.chunkID, "RIFF", 4), "WAV chunk ID bad (must be RIFF)");
-	xassert(!memcmp(h.format, "WAVE", 4), "WAV format bad (must be WAVE)");
-	xassert(!memcmp(h.subchunk1ID, "fmt ", 4), "WAV subchunk 1 ID bad (must be fmt)");
-	xassert(!memcmp(h.subchunk2ID, "data", 4), "WAV subchunk 2 ID bad (must be data), perhaps extra params exist? Report it");
-	xassert(h.subchunk1Size == 16, "WAV subchunk 1 size %u bad (must be 16)", h.subchunk1Size);
-	xassert(h.audioFormat == 1, "WAV audio format %u unknown (must be 1), perhaps file is compressed?", h.audioFormat);
-	xassert(h.numChannels == 1, "WAV has %u channels, but only mono files are supported", h.numChannels);
-	xassert(h.sampleRate >= 8000 && h.sampleRate <= 96000, "WAV probably has bogus sample rate %u, report if it's incorrect", h.sampleRate);
-	xassert(h.bitsPerSample == 16, "WAV has unsupported number of bits per sample %u (must be 16)", h.bitsPerSample);
-	xassert(h.byteRate == h.numChannels * h.sampleRate * h.bitsPerSample / 8, "WAV byte rate %u bad (must be %u)", h.byteRate, h.numChannels * h.sampleRate * h.bitsPerSample / 8);
-	xassert(h.blockAlign == h.numChannels * h.bitsPerSample / 8, "WAV has unsupported block align value %u (must be %u)", h.blockAlign, h.numChannels * h.bitsPerSample / 8);
+	if(memcmp(h.chunkID, "RIFF", 4)) {
+		loge("WAV chunk ID bad (must be RIFF)");
+		return false;
+	}
+
+	if(memcmp(h.format, "WAVE", 4)) {
+		loge("WAV format bad (must be WAVE)");
+		return false;
+	}
+
+	if(memcmp(h.subchunk1ID, "fmt ", 4)) {
+		loge("WAV subchunk 1 ID bad (must be fmt)");
+		return false;
+	}
+
+	if(memcmp(h.subchunk2ID, "data", 4)) {
+		loge("WAV subchunk 2 ID bad (must be data), perhaps extra params exist? Report it");
+		return false;
+	}
+
+	if(h.subchunk1Size != 16) {
+		loge("WAV subchunk 1 size %u bad (must be 16)", h.subchunk1Size);
+		return false;
+	}
+
+	if(h.audioFormat != 1) {
+		loge("WAV audio format %u unknown (must be 1), perhaps file is compressed?", h.audioFormat);
+		return false;
+	}
+
+	if(h.numChannels != 1) {
+		loge("WAV has %u channels, but only mono files are supported", h.numChannels);
+		return false;
+	}
+
+	if(h.sampleRate < 8000 || h.sampleRate > 96000) {
+		loge("WAV probably has bogus sample rate %u, report if it's incorrect", h.sampleRate);
+		return false;
+	}
+
+	if(h.bitsPerSample != 16) {
+		loge("WAV has unsupported number of bits per sample %u (must be 16)", h.bitsPerSample);
+		return false;
+	}
+
+	if(h.byteRate != h.numChannels * h.sampleRate * h.bitsPerSample / 8) {
+		loge("WAV byte rate %u bad (must be %u)", h.byteRate, h.numChannels * h.sampleRate * h.bitsPerSample / 8);
+		return false;
+	}
+
+	if(h.blockAlign != h.numChannels * h.bitsPerSample / 8) {
+		loge("WAV has unsupported block align value %u (must be %u)", h.blockAlign, h.numChannels * h.bitsPerSample / 8);
+		return false;
+	}
 
 	m_rate = h.sampleRate;
 	logd("WAV sample rate: %u Hz", m_rate);
+	return true;
 }
 
 unsigned Wav::getRate() const
@@ -60,29 +141,45 @@ unsigned Wav::getRate() const
 	return m_rate;
 }
 
-bool Wav::getSamples(int16_t *samples, size_t size)
+int Wav::getFD() const
 {
-	const size_t rs(read(samples, size * 2));
-	if(rs != size * 2) {
+	return m_fd;
+}
+
+bool Wav::isEOF() const
+{
+	return m_eof;
+}
+
+bool Wav::getBuffer(std::vector<int16_t> &audioBuffer)
+{
+	if(m_rawBuffer.size() < audioBuffer.size() * 2) {
 		return false;
 	}
 
-	for(size_t i(0); i < size; ++i) {
-		const uint16_t he(le16toh(samples[i]));
-		memcpy(&samples[i], &he, 2);
+	for(size_t i(0); i != audioBuffer.size(); ++i) {
+		const uint16_t *le((const uint16_t *) &m_rawBuffer[i * 2]);
+		const uint16_t he(le16toh(*le));
+		memcpy(&audioBuffer[i], &he, 2);
 	}
 
+	m_rawBuffer.erase(m_rawBuffer.begin(), m_rawBuffer.begin() + audioBuffer.size() * 2);
 	return true;
 }
 
-size_t Wav::read(void *ptr, size_t sz)
+void Wav::readHandler()
 {
-	FILE *const fp(m_file ? (FILE *) m_file : stdin);
-	size_t rs(fread(ptr, 1, sz, fp));
+	char buf[1024];
+	const ssize_t rs(read(m_fd, buf, sizeof(buf)));
 	if(rs == 0) {
-		xassert(!ferror(fp), "Read error: %m");
+		m_eof = true;
+		return;
 	}
 
-	xassert(rs <= sz, "fread() returned nonsense");
-	return rs;
+	xassert(rs > 0, "Error reading WAV: %m");
+	xassert((size_t) rs <= sizeof(buf), "WAV read returned nonsense (%zd gt %zu)", rs, sizeof(buf));
+
+	const size_t curSize(m_rawBuffer.size());
+	m_rawBuffer.resize(curSize + rs);
+	memcpy(&m_rawBuffer[curSize], buf, rs);
 }

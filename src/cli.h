@@ -12,6 +12,7 @@ public:
 	std::string getInputFile() const;
 	std::string getOutputDir() const;
 	bool getPrintAudioLevel() const;
+	bool getSuppressX() const;
 
 private:
 	bool m_needExit{false};
@@ -19,6 +20,7 @@ private:
 	std::string m_inputFile{};
 	std::string m_outputDir{};
 	bool m_printAudioLevel{false};
+	bool m_suppressX{false};
 
 	void showVersion();
 	void showHelp();

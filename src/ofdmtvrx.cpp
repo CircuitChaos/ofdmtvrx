@@ -4,6 +4,7 @@
 #include <cctype>
 #include <algorithm>
 #include <unistd.h>
+#include <memory>
 #include "throw.h"
 #include "log.h"
 #include "cli.h"
@@ -13,6 +14,10 @@
 #include "decoder_constants.h"
 #include "decoder_factory.h"
 #include "audiolevelprinter.h"
+#include "version.h"
+#include "xview.h"
+#include "fdwatch.h"
+#include "sigfd.h"
 
 static std::string getModeString(int mode)
 {
@@ -59,8 +64,15 @@ static void Main(int argc, char *const argv[])
 	}
 
 	logger.setLevel(cli.getLogLevel());
+
+	if(cli.getSuppressX() && !version::withX()) {
+		logn("Warning: -n has no effect in this build");
+	}
+
 	xassert(!cli.getInputFile().empty() || isatty(0) != 1, "Refusing to read samples from a terminal; use -h for help");
 
+	// TODO: note in the doc that it will block until header is read
+	// (X windows won't be created before that)
 	Wav wav(cli.getInputFile());
 	DecoderFactory df(wav.getRate());
 	Interface *decoder(df());
@@ -95,72 +107,107 @@ static void Main(int argc, char *const argv[])
 	// TODO print audio offset in seconds
 
 	AudioLevelPrinter alp;
+	FDWatch w;
+	w.add(wav.getFD());
+
+	std::unique_ptr<XView> xview;
+	if(version::withX() && !cli.getSuppressX()) {
+		xview.reset(new XView());
+		w.add(xview->getFD());
+	}
+
+	SigFD sfd;
+	w.add(sfd.getFD());
 
 	uint32_t offset(0);
-	while(wav.getSamples(&audioBuffer[0], audioBuffer.size())) {
-		if(cli.getPrintAudioLevel()) {
-			alp.process(audioBuffer);
+	for(;;) {
+		w.watch();
+
+		if(w.isReadable(sfd.getFD())) {
+			sfd.readHandler();
+			break;
 		}
 
-		const int status(decoder->process(&spectrum[0], &spectrogram[0], &constellation[0], &peakMeter[0], &audioBuffer[0], 0, 0));
-		switch(status) {
-			case STATUS_OKAY:
-				break;
-
-			case STATUS_FAIL:
-				logv("Error decoding preamble");
-				break;
-
-			case STATUS_SYNC: {
-				float cfo;
-				int32_t mode;
-				char call[9];
-				decoder->cached(&cfo, &mode, (int8_t *) call);
-				logv("Synchronized, carrier: %.2f Hz, mode: %s, call: %s", cfo, getModeString(mode).c_str(), trimCall(call).c_str());
+		if(w.isReadable(wav.getFD())) {
+			wav.readHandler();
+			if(wav.isEOF()) {
 				break;
 			}
 
-			case STATUS_DONE: {
-				const int bitFlips(decoder->fetch(&payload[0]));
-				if(bitFlips < 0) {
-					logv("Error decoding data (CRC check failed)");
-					break;
+			while(wav.getBuffer(audioBuffer)) {
+				if(cli.getPrintAudioLevel()) {
+					alp.process(audioBuffer);
 				}
 
-				logv("Decoded payload");
-				crs.usePayload(payload);
-				uint32_t crc32;
-				if(crs.fileReady(crc32)) {
-					std::string prefix(outputDir);
-					if(!prefix.empty()) {
-						prefix += "/";
+				const int status(decoder->process(&spectrum[0], &spectrogram[0], &constellation[0], &peakMeter[0], &audioBuffer[0], 0, 0));
+				if(xview.get()) {
+					xview->update(spectrum, spectrogram, constellation, peakMeter, audioBuffer);
+				}
+
+				switch(status) {
+					case STATUS_OKAY:
+						break;
+
+					case STATUS_FAIL:
+						logv("Error decoding preamble");
+						break;
+
+					case STATUS_SYNC: {
+						float cfo;
+						int32_t mode;
+						char call[9];
+						decoder->cached(&cfo, &mode, (int8_t *) call);
+						logv("Synchronized, carrier: %.2f Hz, mode: %s, call: %s", cfo, getModeString(mode).c_str(), trimCall(call).c_str());
+						break;
 					}
 
-					const std::string fileName(util::format("%08X-%08X.%s", offset, crc32, crs.getExtension().c_str()));
-					crs.save(prefix + fileName);
+					case STATUS_DONE: {
+						const int bitFlips(decoder->fetch(&payload[0]));
+						if(bitFlips < 0) {
+							logv("Error decoding data (CRC check failed)");
+							break;
+						}
+
+						logv("Decoded payload");
+						crs.usePayload(payload);
+						uint32_t crc32;
+						if(crs.fileReady(crc32)) {
+							std::string prefix(outputDir);
+							if(!prefix.empty()) {
+								prefix += "/";
+							}
+
+							const std::string fileName(util::format("%08X-%08X.%s", offset, crc32, crs.getExtension().c_str()));
+							crs.save(prefix + fileName);
+						}
+						break;
+					}
+
+					/* This actually seems unused */
+					case STATUS_HEAP:
+						loge("Not enough memory");
+						break;
+
+					case STATUS_NOPE: {
+						float cfo;
+						int32_t mode;
+						char call[9];
+						decoder->cached(&cfo, &mode, (int8_t *) call);
+						logv("%s, carrier: %.2f Hz, mode: %s, call: %s", mode ? "Ignoring preamble" : "Received ping", cfo, getModeString(mode).c_str(), trimCall(call).c_str());
+						break;
+					}
+
+					default:
+						break;
 				}
-				break;
+
+				offset += audioBuffer.size();
 			}
-
-			/* This actually seems unused */
-			case STATUS_HEAP:
-				loge("Not enough memory");
-				break;
-
-			case STATUS_NOPE: {
-				float cfo;
-				int32_t mode;
-				char call[9];
-				decoder->cached(&cfo, &mode, (int8_t *) call);
-				logv("%s, carrier: %.2f Hz, mode: %s, call: %s", mode ? "Ignoring preamble" : "Received ping", cfo, getModeString(mode).c_str(), trimCall(call).c_str());
-				break;
-			}
-
-			default:
-				break;
 		}
 
-		++offset;
+		if(xview.get() && w.isReadable(xview->getFD())) {
+			xview->readHandler();
+		}
 	}
 }
 

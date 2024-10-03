@@ -12,3 +12,12 @@ std::string version::getBuild()
 {
 	return std::string(__DATE__) + " " + __TIME__;
 }
+
+bool version::withX()
+{
+#ifdef WITH_X
+	return true;
+#else
+	return false;
+#endif
+}
