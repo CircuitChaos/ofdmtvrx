@@ -17,10 +17,8 @@ if 'WITH_X' in ARGUMENTS:
         Exit(1)
 else:
     print('WITH_X argument is mandatory')
-    print('')
-    print('Use WITH_X=0 to build without X Window System support')
-    print('Use WITH_X=1 to build with X Window System support')
-    print('')
+    print('- use WITH_X=0 to build without X Window System support')
+    print('- use WITH_X=1 to build with X Window System support')
     print('Building with X requires X11 library, but program can still run')
     print('without X available (the -n option appears).')
     Exit(1)

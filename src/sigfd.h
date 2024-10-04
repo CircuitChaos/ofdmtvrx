@@ -8,7 +8,9 @@ public:
 	~SigFD();
 
 	int getFD() const;
-	void readHandler();
+
+	/* Returns signal number or 0 */
+	int readHandler();
 
 private:
 	sigset_t m_sigset;

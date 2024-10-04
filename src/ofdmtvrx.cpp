@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <unistd.h>
 #include <memory>
+#include <csignal>
+#include <cstring>
 #include "throw.h"
 #include "log.h"
 #include "cli.h"
@@ -71,8 +73,6 @@ static void Main(int argc, char *const argv[])
 
 	xassert(!cli.getInputFile().empty() || isatty(0) != 1, "Refusing to read samples from a terminal; use -h for help");
 
-	// TODO: note in the doc that it will block until header is read
-	// (X windows won't be created before that)
 	Wav wav(cli.getInputFile());
 	DecoderFactory df(wav.getRate());
 	Interface *decoder(df());
@@ -124,8 +124,23 @@ static void Main(int argc, char *const argv[])
 		w.watch();
 
 		if(w.isReadable(sfd.getFD())) {
-			sfd.readHandler();
-			break;
+			const int signo(sfd.readHandler());
+			if(signo == SIGTERM || signo == SIGINT) {
+				loge("Terminating on signal %d (%s)", signo, strsignal(signo));
+				break;
+			}
+			else if(signo == SIGUSR1) {
+				if(xview) {
+					logd("Got SIGUSR1, reopening closed windows");
+					xview->reopenWindows();
+				}
+				else {
+					logd("Got SIGUSR1, but ignoring it, as X support is disabled");
+				}
+			}
+			else {
+				xthrow("Unknown signal read from signalfd (%d, %s)", signo, strsignal(signo));
+			}
 		}
 
 		if(w.isReadable(wav.getFD())) {
@@ -140,7 +155,7 @@ static void Main(int argc, char *const argv[])
 				}
 
 				const int status(decoder->process(&spectrum[0], &spectrogram[0], &constellation[0], &peakMeter[0], &audioBuffer[0], 0, 0));
-				if(xview.get()) {
+				if(xview) {
 					xview->update(spectrum, spectrogram, constellation, peakMeter, audioBuffer);
 				}
 
@@ -205,7 +220,10 @@ static void Main(int argc, char *const argv[])
 			}
 		}
 
-		if(xview.get() && w.isReadable(xview->getFD())) {
+		/* Checking for readability before calling handler resulted in events not being
+		 * read if we were reading .wav file (heavy load) instead of arecord input.
+		 */
+		if(xview) {
 			xview->readHandler();
 		}
 	}

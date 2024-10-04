@@ -47,22 +47,30 @@ bool Wav::readHeader()
 		uint32_t subchunk2Size;
 	} __attribute__((packed));
 
+	char buf[sizeof(Hdr)];
+	size_t pos(0);
+	while(pos != sizeof(Hdr)) {
+		const ssize_t rs(read(m_fd, buf + pos, sizeof(Hdr) - pos));
+		if(rs < 0) {
+			loge("Error reading WAV header: %m");
+			return false;
+		}
+
+		if(rs == 0) {
+			loge("EOF when reading WAV header");
+			return false;
+		}
+
+		if((size_t) rs > (sizeof(Hdr) - pos)) {
+			loge("read() returned nonsense (%zd gt %zu)", rs, sizeof(Hdr) - pos);
+			return false;
+		}
+
+		pos += rs;
+	}
+
 	Hdr h;
-	const ssize_t rs(read(m_fd, &h, sizeof(h)));
-	if(rs < 0) {
-		loge("Error reading WAV header: %m");
-		return false;
-	}
-
-	if(rs == 0) {
-		loge("EOF when reading WAV header");
-		return false;
-	}
-
-	if((size_t) rs != sizeof(h)) {
-		loge("WAV header truncated (got only %zd bytes, need %zu)", rs, sizeof(h));
-		return false;
-	}
+	memcpy(&h, buf, sizeof(Hdr));
 
 	// not done, as this field is unused by us
 	// h.chunkSize     = le32toh(h.chunkSize);
