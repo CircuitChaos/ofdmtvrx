@@ -2,7 +2,7 @@
 
 ## Preface
 
-COFDMTV is an interesting ham radio mode, developed by Ahmet Inan and used to send digitally-encoded files (typically images) via any audio channel – typically a FM radio channel.
+COFDMTV is an interesting ham radio mode, developed by Ahmet Inan and used to send digitally-encoded files (typically images) via any audio channel – typically a FM radio channel. [Here's](https://www.aicodix.de/cofdmtv/) a brief description.
 
 At least one team operating amateur stratospheric balloons (HAST – High Altitude Stratospheric Team) uses this mode instead of traditionally used analogue SSTV to transmit good quality images captured by the balloon floating in the stratosphere.
 
@@ -16,17 +16,25 @@ If you want to read more about practical use of COFDMTV and my first attempts at
 
 ## How to build
 
-You can build `ofdmtvrx` either with support for X11, or without it, as a fully console-based program. If support for X is compiled-in, the application will still be able to run as a console application (without X) by using `-n` command-line switch, although in this case libX11 must exist for it to build and start.
+You can build `ofdmtvrx` either with support for X11, or without it, as a fully console-based program. If support for X is compiled-in, the application will still be able to run as a console application (without X) by using `-n` command line switch, although in this case libX11 must exist for it to build and start.
 
 X11 support creates windows with oscilloscope, spectrum, spectrogram, constellation, and peak meter.
 
-This one-liner should do the trick on Debian:
+This command should do the trick on Debian:
 
-`sudo apt-get install g++ scons git libx11-dev && git clone https://github.com/CircuitChaos/ofdmtvrx && cd ofdmtvrx && scons WITH_X=1 && sudo scons install`
+```
+sudo apt-get install g++ scons git libx11-dev && \
+git clone https://github.com/CircuitChaos/ofdmtvrx && \
+cd ofdmtvrx && scons WITH_X=1 && sudo scons install
+```
 
 Or, if you don't need X support:
 
-`sudo apt-get install g++ scons git && git clone https://github.com/CircuitChaos/ofdmtvrx && cd ofdmtvrx && scons WITH_X=0 && sudo scons install`
+```
+sudo apt-get install g++ scons git && \
+git clone https://github.com/CircuitChaos/ofdmtvrx && \
+cd ofdmtvrx && scons WITH_X=0 && sudo scons install
+```
 
 There may be some other dependencies – if you happen to stumble upon them, please let me know.
 
@@ -79,26 +87,26 @@ When running with X, three windows are created:
 * Spectrum and spectrogram, containing current signal in a frequency domain (the same as in Assempix)
 * Constellation and peak meter, the same as in Assempix
 
-Oscilloscope window can be resized, other windows can't. Each window can be closed. If you closed a window by accident, send SIGUSR1 to reopen all windows.
+Oscilloscope window can be resized, other windows can't. Each window can be closed. If you closed a window by accident, send `SIGUSR1` to reopen all windows (`killall -USR1 ofdmtvrx`).
 
 Window with last received image is *not* created – it's a TODO.
 
 ## TODO
 
 * Input processing
-** Better sound level measurement (now it's only peak detection)
-** Print audio offset in seconds (useful for working with pre-recorded .wav files)
-** Better .wav file handling (with LIST chunks), maybe delegated to `sox` or some library
+  * Better sound level measurement (now it's only peak detection)
+  * Print audio offset in seconds (useful for working with pre-recorded .wav files)
+  * Better .wav file handling (with LIST chunks), maybe delegated to `sox` or some library
 * Output file handling
-** Create output directory if it doesn't exist
-** Add option to save corrupted files
-** Better duplicate file cache handling
-** Determine file type / extension (now .jpg is assumed, might be incorrect)
+  * Create output directory if it doesn't exist
+  * Add option to save corrupted files
+  * Better duplicate file cache handling
+  * Determine file type / extension (now .jpg is assumed, might be incorrect)
 * X11 integration
-** Create window with a last received image
-** Windows are created in the middle of the screen, on top of each other; do something about it
+  * Create window with a last received image
+  * Windows are created in the middle of the screen, on top of each other; do something about it
 * Miscellaneous
-** Import Ahmet's code with Git submodules
+  * Import Ahmet's code with Git submodules
 
 ## License
 
