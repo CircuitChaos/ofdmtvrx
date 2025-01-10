@@ -15,7 +15,7 @@ std::string version::getBuild()
 
 bool version::withX()
 {
-#ifdef WITH_X
+#if defined(WITH_X) || defined(PLATFORM_WIN)
 	return true;
 #else
 	return false;

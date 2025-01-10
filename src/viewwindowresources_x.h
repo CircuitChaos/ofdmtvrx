@@ -1,14 +1,14 @@
 #pragma once
 
-#ifdef WITH_X
+#if defined(PLATFORM_POSIX) && defined(WITH_X)
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
-struct XWindowRes {
+struct ViewWindowResourcesX {
 public:
-	XWindowRes(Display *dpy);
-	~XWindowRes();
+	ViewWindowResourcesX(Display *dpy);
+	~ViewWindowResourcesX();
 
 	Display *const dpy;
 	Window win{None};

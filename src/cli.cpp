@@ -107,10 +107,10 @@ void Cli::showVersion()
 {
 	printf("ofdmtvrx %s built %s\n", version::getVersion().c_str(), version::getBuild().c_str());
 	if(version::withX()) {
-		printf("This build supports X Window System\n");
+		printf("This build supports GUI\n");
 	}
 	else {
-		printf("This build doesn't support X Window System\n");
+		printf("This build doesn't support GUI\n");
 	}
 	printf("Newest version: https://github.com/CircuitChaos/ofdmtvrx/\n");
 	m_needExit = true;
@@ -124,7 +124,7 @@ void Cli::showHelp()
 	                    "  -h: show help (this screen)\n"
 	                    "  -v: show version\n"
 	                    "  -p: print peak input audio level once per second (with normal logging level)\n"
-	                    "  -n: don't use X Window System (console only)\n"
+	                    "  -n: don't use GUI (console-only mode)\n"
 	                    "\n"
 	                    "Logging levels:\n"
 	                    "  d: debug, all diagnostic info is printed\n"
@@ -137,7 +137,7 @@ void Cli::showHelp()
 
 	printf("%s", help);
 	if(!version::withX()) {
-		printf("-n has no effect in this build\n");
+		printf("-n has no effect in this build.\n");
 	}
 
 	m_needExit = true;

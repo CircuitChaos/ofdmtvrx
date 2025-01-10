@@ -17,7 +17,9 @@
 #include "decoder_factory.h"
 #include "audiolevelprinter.h"
 #include "version.h"
-#include "xview.h"
+#include "view.h"
+#include "view_x.h"
+#include "view_win32.h"
 #include "fdwatch.h"
 #include "sigfd.h"
 #include "platform.h"
@@ -108,15 +110,24 @@ static void Main(int argc, char *const argv[])
 	// TODO print audio offset in seconds
 
 	AudioLevelPrinter alp;
-	std::unique_ptr<XView> xview;
+	std::unique_ptr<View> view;
+
+	if(version::withX() && !cli.getSuppressX()) {
+#if defined(PLATFORM_WIN)
+		view.reset(new ViewWin32());
+#elif defined(PLATFORM_POSIX) && defined(WITH_X)
+		view.reset(new ViewX());
+#else
+		xthrow("Internal inconsistency, could not create view");
+#endif
+	}
 
 #ifdef USE_FDWATCH
 	FDWatch w;
 	w.add(wav.getFD());
 
-	if(version::withX() && !cli.getSuppressX()) {
-		xview.reset(new XView());
-		w.add(xview->getFD());
+	if(view.get()) {
+		w.add(view->getFD());
 	}
 
 	SigFD sfd;
@@ -135,9 +146,9 @@ static void Main(int argc, char *const argv[])
 				break;
 			}
 			else if(signo == SIGUSR1) {
-				if(xview) {
+				if(view) {
 					logd("Got SIGUSR1, reopening closed windows");
-					xview->reopenWindows();
+					view->reopenWindows();
 				}
 				else {
 					logd("Got SIGUSR1, but ignoring it, as X support is disabled");
@@ -161,8 +172,8 @@ static void Main(int argc, char *const argv[])
 				}
 
 				const int status(decoder->process(&spectrum[0], &spectrogram[0], &constellation[0], &peakMeter[0], &audioBuffer[0], 0, 0));
-				if(xview) {
-					xview->update(spectrum, spectrogram, constellation, peakMeter, audioBuffer);
+				if(view) {
+					view->update(spectrum, spectrogram, constellation, peakMeter, audioBuffer);
 				}
 
 				switch(status) {
@@ -230,8 +241,8 @@ static void Main(int argc, char *const argv[])
 		/* Checking for readability before calling handler resulted in events not being
 		 * read if we were reading .wav file (heavy load) instead of arecord input.
 		 */
-		if(xview) {
-			xview->readHandler();
+		if(view) {
+			view->readHandler();
 		}
 #endif
 	}

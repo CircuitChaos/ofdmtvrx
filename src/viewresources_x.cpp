@@ -1,8 +1,8 @@
 #ifdef WITH_X
 
-#include "xresources.h"
+#include "viewresources_x.h"
 
-XResources::~XResources()
+ViewResourcesX::~ViewResourcesX()
 {
 	// TODO should we also free winDelMsg here?
 

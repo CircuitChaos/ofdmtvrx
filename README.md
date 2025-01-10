@@ -44,7 +44,7 @@ If the build succeeds, you will have a binary called `ofdmtvrx` in your `/usr/lo
 
 ## How to build on MS Windows
 
-Here's a step-by-step guide I tested on Windows 7. Note that on Windows this program, at least for now, is console-only – decodes images, saves them, but doesn't show any windows. You have to be familiar with Windows command prompt (cmd) to build and use it.
+Here's a step-by-step guide I tested on Windows 7. You have to be familiar with Windows command prompt (cmd) to build and use it.
 
 First you need to download some tools:
 
@@ -58,6 +58,10 @@ Extract it to a convenient place (if you can't, then you also need some program 
 
 SCons can be found [here](https://sourceforge.net/projects/scons/files/scons-local/). Pick the newest version and download the zip file. Unzip it to `C:\ofdm\scons` (or somewhere else, and adjust `set PATH` below).
 
+You also need Python, [here](https://www.python.org/downloads/windows/). Pick the „Windows embeddable package (64-bit)”, download, unzip to `C:\ofdm\python` (or somewhere else, and adjust `set PATH` below).
+
+If you're on Windows 7, use [Python 3.8.7](https://www.python.org/ftp/python/3.8.7/python-3.8.7-embed-amd64.zip). Newer versions won't work (there's a DLL missing).
+
 Last program is Git. Click [here](https://git-scm.com/downloads/win), select „64-bit Git for Windows Portable” and run it. It will ask where to extract the files. Type `C:\ofdm\git` (or, as above, something else, and adjust `set PATH`).
 
 If an error appears saying that GetSystemTimePreciseAsFileTime symbol (entry point) is not found in KERNEL32.dll, ignore it.
@@ -66,7 +70,7 @@ Finally, you can go to command line (Windows+R, cmd, Enter) and type these comma
 
 ```
 cd c:\ofdm
-set PATH=%PATH%;c:\ofdm\git\bin;c:\ofdm\mingw64\bin;c:\ofdm\scons
+set PATH=%PATH%;c:\ofdm\git\bin;c:\ofdm\mingw64\bin;c:\ofdm\scons;c:\ofdm\python
 git clone https://github.com/CircuitChaos/ofdmtvrx
 cd ofdmtvrx
 scons
@@ -77,6 +81,8 @@ File called `ofdmtvrx.exe` will be created in the `build` directory. Copy it whe
 Note that there's no `WITH_X` argument on Windows.
 
 Also note that typically Windows programs use slash to specify arguments (like /i, /o, etc.), but this program uses minus (-i, -o, etc.), like on Linux.
+
+GUI support for Windows version of this program was written by [Grzegorz Niemirowski, SP5GND](https://www.grzegorz.net/) – thank you!
 
 ## How to use
 
@@ -150,7 +156,6 @@ Window with last received image is *not* created – it's a TODO.
 * MS Windows
   * Figure a way to read directly from a sound card, like with `arecord` on Linux
   * Check if it works with files larger than 2 GiB (there's no `O_LARGEFILE`)
-  * Create graphical windows, like on X
 * Other platforms
   * Port to other platforms, as needed – BSD, MacOS, etc.
 * Miscellaneous

@@ -11,4 +11,9 @@ static const int constellation_width = 64, constellation_height = 64;
 static const int peak_meter_width = 16; //, peak_meter_height = 1;
 static const int data_bits        = 43040;
 
+/* Technically these are not decoder constants. They're just here for convenience */
+static const unsigned peak_meter_height           = 16;
+static const unsigned oscilloscope_initial_width  = 640;
+static const unsigned oscilloscope_initial_height = 240;
+
 } // namespace decoder_constants

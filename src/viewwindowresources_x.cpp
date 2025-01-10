@@ -1,13 +1,13 @@
-#ifdef WITH_X
+#if defined(PLATFORM_POSIX) && defined(WITH_X)
 
-#include "xwindowres.h"
+#include "viewwindowresources_x.h"
 
-XWindowRes::XWindowRes(Display *dpy)
+ViewWindowResourcesX::ViewWindowResourcesX(Display *dpy)
     : dpy(dpy)
 {
 }
 
-XWindowRes::~XWindowRes()
+ViewWindowResourcesX::~ViewWindowResourcesX()
 {
 	if(image) {
 		/* Frees also imagePixels */
