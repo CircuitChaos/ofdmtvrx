@@ -1,4 +1,4 @@
-#ifdef WITH_X
+#if defined(PLATFORM_POSIX) && defined(WITH_X)
 
 #include "viewresources_x.h"
 
