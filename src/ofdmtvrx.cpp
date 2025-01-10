@@ -237,6 +237,7 @@ static void Main(int argc, char *const argv[])
 			}
 #ifdef USE_FDWATCH
 		}
+#endif
 
 		/* Checking for readability before calling handler resulted in events not being
 		 * read if we were reading .wav file (heavy load) instead of arecord input.
@@ -244,7 +245,6 @@ static void Main(int argc, char *const argv[])
 		if(view) {
 			view->readHandler();
 		}
-#endif
 	}
 }
 
