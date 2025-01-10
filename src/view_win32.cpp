@@ -44,7 +44,7 @@ void ViewWin32::reopenWindows()
 	}
 
 	if(!m_constellation) {
-		m_constellation.reset(new ViewWindowWin32(decoder_constants::constellation_width, decoder_constants::constellation_height + decoder_constants::peak_meter_height, "Constellation", false));
+		m_constellation.reset(new ViewWindowWin32(decoder_constants::constellation_width * 2, (decoder_constants::constellation_height + decoder_constants::peak_meter_height) * 2, "Constellation", false));
 	}
 }
 

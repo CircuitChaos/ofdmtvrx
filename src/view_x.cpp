@@ -121,7 +121,7 @@ void ViewX::reopenWindows()
 	}
 
 	if(!m_constellation) {
-		m_constellation.reset(new ViewWindowX(decoder_constants::constellation_width, decoder_constants::constellation_height + decoder_constants::peak_meter_height, "Constellation", false, m_res));
+		m_constellation.reset(new ViewWindowX(decoder_constants::constellation_width * 2, (decoder_constants::constellation_height + decoder_constants::peak_meter_height) * 2, "Constellation", false, m_res));
 	}
 }
 

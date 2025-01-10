@@ -29,6 +29,20 @@ void ViewWindow::setPixel(unsigned x, unsigned y, uint32_t rgb)
 	setPixel(x, y, rgb >> 24, (rgb >> 8) & 0xff, (rgb >> 16) & 0xff);
 }
 
+void ViewWindow::setScaledPixel(unsigned x, unsigned y, unsigned scale, uint32_t rgb)
+{
+	setScaledPixel(x, y, scale, rgb >> 24, (rgb >> 8) & 0xff, (rgb >> 16) & 0xff);
+}
+
+void ViewWindow::setScaledPixel(unsigned x, unsigned y, unsigned scale, uint8_t red, uint8_t green, uint8_t blue)
+{
+	for(unsigned sy(0); sy < scale; ++sy) {
+		for(unsigned sx(0); sx < scale; ++sx) {
+			setPixel(x * scale + sx, y * scale + sy, red, green, blue);
+		}
+	}
+}
+
 void ViewWindow::drawLine(unsigned x1, unsigned y1, unsigned x2, unsigned y2, uint8_t red, uint8_t green, uint8_t blue)
 {
 	xassert(x1 < m_width && y1 < m_height, "Line start out of range (point at %ux%u, size is %ux%u)", x1, y1, m_width, m_height);

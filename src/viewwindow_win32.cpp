@@ -44,7 +44,6 @@ ViewWindowWin32::ViewWindowWin32(unsigned width, unsigned height, const std::str
 	ShowWindow(m_hwnd, SW_SHOWDEFAULT);
 	UpdateWindow(m_hwnd);
 	recreateImage();
-	redraw(); // TODO needed?
 }
 
 ViewWindowWin32::~ViewWindowWin32()
@@ -84,6 +83,12 @@ LRESULT ViewWindowWin32::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 			EndPaint(m_hwnd, &m_paintStruct);
 			break;
 		}
+
+		case WM_SIZE:
+			if(m_canResize) {
+				resize(LOWORD(lParam), HIWORD(lParam));
+			}
+			break;
 
 		case WM_DESTROY:
 			PostQuitMessage(0);

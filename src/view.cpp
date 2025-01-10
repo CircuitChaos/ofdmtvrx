@@ -28,8 +28,6 @@ void View::update(const std::vector<uint32_t> &spectrum, const std::vector<uint3
 		createConstellation(constellation, peakMeter);
 		m_constellation->redraw();
 	}
-
-	// TODO call readHandler here? check if works without it
 }
 
 void View::createOscilloscope(const std::vector<int16_t> &audioBuffer)
@@ -89,13 +87,13 @@ void View::createConstellation(const std::vector<uint32_t> &constellation, const
 	for(unsigned y(0); y < decoder_constants::constellation_height; ++y) {
 		for(unsigned x(0); x < decoder_constants::constellation_width; ++x) {
 			const uint8_t rgb(constellation[y * decoder_constants::constellation_width + x] ? 0xff : 0);
-			m_constellation->setPixel(x, y, rgb, rgb, rgb);
+			m_constellation->setScaledPixel(x, y, 2, rgb, rgb, rgb);
 		}
 	}
 
 	for(unsigned y(0); y < decoder_constants::peak_meter_height; ++y) {
 		for(unsigned x(0); x < decoder_constants::constellation_width; ++x) {
-			m_constellation->setPixel(x, y + decoder_constants::constellation_height, peakMeter[x / (decoder_constants::constellation_width / decoder_constants::peak_meter_width)]);
+			m_constellation->setScaledPixel(x, y + decoder_constants::constellation_height, 2, peakMeter[x / (decoder_constants::constellation_width / decoder_constants::peak_meter_width)]);
 		}
 	}
 }
