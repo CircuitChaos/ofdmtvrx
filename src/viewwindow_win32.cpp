@@ -2,6 +2,7 @@
 
 #include "viewwindow_win32.h"
 #include <cstring>
+#include <memory>
 #include "throw.h"
 
 ViewWindowWin32::ViewWindowWin32(unsigned width, unsigned height, const std::string &name, bool canResize)
@@ -78,8 +79,21 @@ LRESULT ViewWindowWin32::WindowProc(UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch(message) {
 		case WM_PAINT: {
+			/* Windows needs this bitmap to be padded.
+			 *
+			 * TODO: If this is too slow, make a single array and do it directly in setPixel()
+			 */
+
+			const size_t paddedWidth((m_width * 3 + 3) & ~0x03);
+			std::vector<BYTE> paddedPixels;
+			paddedPixels.resize(paddedWidth * m_height);
+
+			for(size_t y(0); y < m_height; ++y) {
+				memcpy(&paddedPixels[paddedWidth * y], &m_pixels[m_width * y * 3], m_width * 3);
+			}
+
 			HDC wndDC = BeginPaint(m_hwnd, &m_paintStruct);
-			SetDIBitsToDevice(wndDC, 0, 0, m_width, m_height, 0, 0, 0, m_height, &m_pixels[0], reinterpret_cast<BITMAPINFO *>(&m_bmpHeader), DIB_RGB_COLORS);
+			SetDIBitsToDevice(wndDC, 0, 0, m_width, m_height, 0, 0, 0, m_height, &paddedPixels[0], reinterpret_cast<BITMAPINFO *>(&m_bmpHeader), DIB_RGB_COLORS);
 			EndPaint(m_hwnd, &m_paintStruct);
 			break;
 		}
@@ -132,6 +146,9 @@ void ViewWindowWin32::recreateImage()
 	m_bmpHeader.biWidth  = m_width;
 	m_bmpHeader.biHeight = -m_height;
 	m_pixels.resize(m_width * m_height * 3);
+	if(!m_pixels.empty()) {
+		memset(&m_pixels[0], 0, m_pixels.size());
+	}
 }
 
 #endif
