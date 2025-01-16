@@ -36,7 +36,8 @@ elif plat == 'win32':
     if 'WITH_X' in ARGUMENTS:
         print('Argument WITH_X is not supported on this platform')
         Exit(1)
-    env['CCFLAGS'] += ' -DPLATFORM_WIN -static'
+    env['CCFLAGS'] += ' -DPLATFORM_WIN'
+    env['LINKFLAGS'] += ' -static'
     env['LIBS'] = 'gdi32'
 else:
     print('Platform %s is unsupported. Try raising a ticket if you need' % plat)
