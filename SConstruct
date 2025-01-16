@@ -1,10 +1,16 @@
 import subprocess
 
+def getGitCommand(cmd):
+    return subprocess.Popen('git ' + cmd, stdout=subprocess.PIPE, shell=True).stdout.read().decode('utf-8').strip()
+
 def getGitHash():
-    return subprocess.Popen('git rev-parse --short HEAD', stdout=subprocess.PIPE, shell=True).stdout.read().decode('utf-8').strip()
+    return getGitCommand('rev-parse --short HEAD')
+
+def getGitTag():
+    return getGitCommand('describe --all --exact-match')
 
 env = Environment()
-env['CCFLAGS']	= '-Wall -Wextra -std=c++17 -O2 -march=native -g -DGIT_HASH=' + getGitHash()
+env['CCFLAGS']	= '-Wall -Wextra -std=c++17 -O2 -march=native -g -DGIT_HASH=' + getGitHash() + ' -DGIT_TAG=' + getGitTag()
 env['CPPPATH']	= ['src', 'aicodix/dsp', 'aicodix/code', 'aicodix']
 
 plat = env['PLATFORM']
@@ -30,7 +36,7 @@ elif plat == 'win32':
     if 'WITH_X' in ARGUMENTS:
         print('Argument WITH_X is not supported on this platform')
         Exit(1)
-    env['CCFLAGS'] += ' -DPLATFORM_WIN'
+    env['CCFLAGS'] += ' -DPLATFORM_WIN -static'
     env['LIBS'] = 'gdi32'
 else:
     print('Platform %s is unsupported. Try raising a ticket if you need' % plat)
