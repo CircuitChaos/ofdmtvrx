@@ -5,7 +5,12 @@
 
 std::string version::getVersion()
 {
-	return std::string("git/") + TO_STR(GIT_HASH);
+	const std::string gitTag(TO_STR(GIT_TAG));
+	if(gitTag.size() <= 5 || gitTag.substr(0, 5) != "tags/") {
+		return std::string("git/") + TO_STR(GIT_HASH);
+	}
+
+	return gitTag.substr(5);
 }
 
 std::string version::getBuild()
