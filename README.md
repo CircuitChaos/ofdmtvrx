@@ -16,6 +16,12 @@ It's based on work by Ahmet Inan and contains his code, although slightly modifi
 
 If you want to read more about practical use of COFDMTV and my first attempts at using Ahmet's [modem decoder](https://github.com/aicodix/modem) and [CRS decoder](https://github.com/aicodix/crs) from a shell script, take a look at [this thread](http://sp7pki.iq24.pl/default.asp?grupa=230409&temat=638916) (in Polish).
 
+The program is available as:
+
+* Source code for Linux
+* Source code for Windows
+* Binary (.exe) file for Windows
+
 ## How to build on Linux
 
 You can build `ofdmtvrx` either with support for X11, or without it, as a fully console-based program. If support for X is compiled-in, the application will still be able to run as a console application (without X) by using `-n` command line switch, although in this case libX11 must exist for it to build and start.
@@ -43,6 +49,8 @@ There may be some other dependencies. If you happen to stumble upon them, please
 If the build succeeds, you will have a binary called `ofdmtvrx` in your `/usr/local/bin` directory. If you don't want to install system-wide, you can skip `sudo scons install` part above – the binary will be located in `build` directory.
 
 ## How to build on MS Windows
+
+Note that you don't **have to** build the program yourself. You can do it if you want some cutting-edge changes that are not versioned yet, or you want to modify the code. If you want to use the pre-built version, just download the newest `.exe` file from the `dist` directory.
 
 Here's a step-by-step guide I tested on Windows 7. You have to be familiar with Windows command prompt (cmd) to build and use it.
 
