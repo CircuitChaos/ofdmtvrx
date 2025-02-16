@@ -37,28 +37,12 @@ Wav::~Wav()
 	}
 }
 
-bool Wav::readHeader()
+bool Wav::readHeaderPart(void *data, size_t size)
 {
-	struct Hdr {
-		char chunkID[4];
-		uint32_t chunkSize;
-		char format[4];
-		char subchunk1ID[4];
-		uint32_t subchunk1Size;
-		uint16_t audioFormat;
-		uint16_t numChannels;
-		uint32_t sampleRate;
-		uint32_t byteRate;
-		uint16_t blockAlign;
-		uint16_t bitsPerSample;
-		char subchunk2ID[4];
-		uint32_t subchunk2Size;
-	} __attribute__((packed));
-
-	char buf[sizeof(Hdr)];
+	char *p((char *) data);
 	size_t pos(0);
-	while(pos != sizeof(Hdr)) {
-		const ssize_t rs(read(m_fd, buf + pos, sizeof(Hdr) - pos));
+	while(pos != size) {
+		const ssize_t rs(read(m_fd, p + pos, size - pos));
 		if(rs < 0) {
 			loge("Error reading WAV header: %s", strerror(errno));
 			return false;
@@ -69,28 +53,104 @@ bool Wav::readHeader()
 			return false;
 		}
 
-		if((size_t) rs > (sizeof(Hdr) - pos)) {
-			loge("read() returned nonsense (" SSIZET_FMT " gt " SIZET_FMT ")", rs, sizeof(Hdr) - pos);
+		if((size_t) rs > (size - pos)) {
+			loge("read() returned nonsense (" SSIZET_FMT " gt " SIZET_FMT ")", rs, size - pos);
 			return false;
 		}
 
 		pos += rs;
 	}
 
-	Hdr h;
-	memcpy(&h, buf, sizeof(Hdr));
+	return true;
+}
 
-	// not done, as this field is unused by us
-	// h.chunkSize     = le32toh(h.chunkSize);
-	h.subchunk1Size = le32toh(h.subchunk1Size);
-	h.audioFormat   = le16toh(h.audioFormat);
-	h.numChannels   = le16toh(h.numChannels);
-	h.sampleRate    = le32toh(h.sampleRate);
-	h.byteRate      = le32toh(h.byteRate);
-	h.blockAlign    = le16toh(h.blockAlign);
-	h.bitsPerSample = le16toh(h.bitsPerSample);
-	// not done, as this field is unused by us
-	// h.subchunk2Size = le32toh(h.subchunk2Size);
+bool Wav::skip(size_t size)
+{
+	while(size) {
+		const size_t bufsz((size > 16384) ? 16384 : size);
+		char buf[bufsz];
+		if(!readHeaderPart(buf, bufsz)) {
+			return false;
+		}
+
+		size -= bufsz;
+	}
+
+	return true;
+}
+
+bool Wav::readFormatSubchunk()
+{
+	struct FmtSubchunk {
+		uint16_t audioFormat;
+		uint16_t numChannels;
+		uint32_t sampleRate;
+		uint32_t byteRate;
+		uint16_t blockAlign;
+		uint16_t bitsPerSample;
+	} __attribute__((packed));
+
+	FmtSubchunk fmt;
+	if(!readHeaderPart(&fmt, sizeof(fmt))) {
+		return false;
+	}
+
+	fmt.audioFormat   = le16toh(fmt.audioFormat);
+	fmt.numChannels   = le16toh(fmt.numChannels);
+	fmt.sampleRate    = le32toh(fmt.sampleRate);
+	fmt.byteRate      = le32toh(fmt.byteRate);
+	fmt.blockAlign    = le16toh(fmt.blockAlign);
+	fmt.bitsPerSample = le16toh(fmt.bitsPerSample);
+
+	if(fmt.audioFormat != 1) {
+		loge("WAV audio format %u unknown (must be 1), perhaps file is compressed?", fmt.audioFormat);
+		return false;
+	}
+
+	if(fmt.numChannels < 1 || fmt.numChannels > 8) {
+		loge("WAV has %u channels, doesn't make sense", fmt.numChannels);
+		return false;
+	}
+
+	if(fmt.sampleRate < 8000 || fmt.sampleRate > 96000) {
+		loge("WAV probably has bogus sample rate %u, report if it's incorrect", fmt.sampleRate);
+		return false;
+	}
+
+	if(fmt.bitsPerSample != 16) {
+		loge("WAV has unsupported number of bits per sample %u (must be 16)", fmt.bitsPerSample);
+		return false;
+	}
+
+	if(fmt.byteRate != fmt.numChannels * fmt.sampleRate * fmt.bitsPerSample / 8) {
+		loge("WAV byte rate %u bad (must be %u)", fmt.byteRate, fmt.numChannels * fmt.sampleRate * fmt.bitsPerSample / 8);
+		return false;
+	}
+
+	if(fmt.blockAlign != fmt.numChannels * fmt.bitsPerSample / 8) {
+		loge("WAV has unsupported block align value %u (must be %u)", fmt.blockAlign, fmt.numChannels * fmt.bitsPerSample / 8);
+		return false;
+	}
+
+	m_rate     = fmt.sampleRate;
+	m_channels = fmt.numChannels;
+	return true;
+}
+
+bool Wav::readHeader()
+{
+	struct Hdr {
+		char chunkID[4];
+		uint32_t chunkSize;
+		char format[4];
+	} __attribute__((packed));
+
+	Hdr h;
+	if(!readHeaderPart(&h, sizeof(h))) {
+		return false;
+	}
+
+	// Warning: if h.chunkSize is to be used, make sure to do le32toh on it
 
 	if(memcmp(h.chunkID, "RIFF", 4)) {
 		loge("WAV chunk ID bad (must be RIFF)");
@@ -102,53 +162,58 @@ bool Wav::readHeader()
 		return false;
 	}
 
-	if(memcmp(h.subchunk1ID, "fmt ", 4)) {
-		loge("WAV subchunk 1 ID bad (must be fmt)");
-		return false;
+	/* - find fmt subchunk and decode it
+	 * - ignore other subchunks
+	 * - stop at data subchunk
+	 */
+
+	bool haveFmt(false);
+	for(;;) {
+		struct SubchunkHdr {
+			char id[4];
+			uint32_t size;
+		} __attribute__((packed));
+
+		SubchunkHdr sh;
+		if(!readHeaderPart(&sh, sizeof(sh))) {
+			return false;
+		}
+
+		sh.size = le32toh(sh.size);
+		logd("Got subchunk \"%c%c%c%c\" (%u bytes)", sh.id[0], sh.id[1], sh.id[2], sh.id[3], sh.size);
+
+		if(!memcmp(sh.id, "fmt ", 4)) {
+			/* Got fmt subchunk */
+			if(sh.size != 16) {
+				loge("WAV subchunk 1 size %u bad (must be 16)", sh.size);
+				return false;
+			}
+
+			if(!readFormatSubchunk()) {
+				return false;
+			}
+
+			haveFmt = true;
+			continue;
+		}
+
+		if(!memcmp(sh.id, "data", 4)) {
+			break;
+		}
+
+		skip(sh.size);
 	}
 
-	if(memcmp(h.subchunk2ID, "data", 4)) {
-		loge("WAV subchunk 2 ID bad (must be data), perhaps extra params exist? Report it");
+	/* In theory, there might be other subchunks after data, but we ignore it,
+	 * as we can't rely on data subchunks size (because it might be a real-time
+	 * stream and data size isn't known yet). So we just process everything
+	 * after data subchunk header.
+	 */
+
+	if(!haveFmt) {
+		loge("\"fmt \" chunk not found");
 		return false;
 	}
-
-	if(h.subchunk1Size != 16) {
-		loge("WAV subchunk 1 size %u bad (must be 16)", h.subchunk1Size);
-		return false;
-	}
-
-	if(h.audioFormat != 1) {
-		loge("WAV audio format %u unknown (must be 1), perhaps file is compressed?", h.audioFormat);
-		return false;
-	}
-
-	if(h.numChannels < 1 || h.numChannels > 8) {
-		loge("WAV has %u channels, doesn't make sense", h.numChannels);
-		return false;
-	}
-
-	if(h.sampleRate < 8000 || h.sampleRate > 96000) {
-		loge("WAV probably has bogus sample rate %u, report if it's incorrect", h.sampleRate);
-		return false;
-	}
-
-	if(h.bitsPerSample != 16) {
-		loge("WAV has unsupported number of bits per sample %u (must be 16)", h.bitsPerSample);
-		return false;
-	}
-
-	if(h.byteRate != h.numChannels * h.sampleRate * h.bitsPerSample / 8) {
-		loge("WAV byte rate %u bad (must be %u)", h.byteRate, h.numChannels * h.sampleRate * h.bitsPerSample / 8);
-		return false;
-	}
-
-	if(h.blockAlign != h.numChannels * h.bitsPerSample / 8) {
-		loge("WAV has unsupported block align value %u (must be %u)", h.blockAlign, h.numChannels * h.bitsPerSample / 8);
-		return false;
-	}
-
-	m_rate     = h.sampleRate;
-	m_channels = h.numChannels;
 
 	logd("WAV sample rate: %u Hz, %u channel(s)", m_rate, m_channels);
 	return true;

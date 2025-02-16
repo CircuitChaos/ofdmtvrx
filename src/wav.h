@@ -31,4 +31,7 @@ private:
 	unsigned m_channels{0};
 
 	bool readHeader();
+	bool readHeaderPart(void *data, size_t size);
+	bool skip(size_t size);
+	bool readFormatSubchunk();
 };
