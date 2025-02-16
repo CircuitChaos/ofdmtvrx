@@ -14,6 +14,12 @@ Wav::Wav(const std::string &file)
 		xassert(m_fd >= 0, "Could not open %s: %s", file.c_str(), strerror(errno));
 		m_close = true;
 	}
+#ifdef PLATFORM_WIN
+	else {
+		/* stdin has to be open in binary mode on Windows */
+		_setmode(_fileno(stdin), _O_BINARY);
+	}
+#endif
 
 	if(!readHeader()) {
 		if(m_close) {
