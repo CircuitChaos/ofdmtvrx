@@ -94,13 +94,13 @@ GUI support for Windows version of this program was written by [Grzegorz Niemiro
 
 ## How to use
 
-Run `ofdmtvrx -h` to see help, or `ofdmtvrx -v` to see version. Typically you should prepare a mono, 16-bit WAV audio recording, and do:
+Run `ofdmtvrx -h` to see help, or `ofdmtvrx -v` to see version. Typically you should prepare a 16-bit WAV audio recording (mono or stereo, doesn't matter, the program internally downmixes to mono), and do:
 
 `ofdmtvrx -i <input file> -o <output dir>`
 
 Output directory must already exist – `ofdmtvrx` won't create it for you, it will just fail with „No such file or directory” on first file save attempt.
 
-If input file is skipped, then `ofdmtvrx` will read from stdin, but there's a check added to make sure you aren't trying to read from a terminal. This check doesn't work on Windows, so if you just run `ofdmtvrx.exe` without arguments, it will do nothing (will look hanged). Just press Ctrl-C.
+If input file is skipped, then `ofdmtvrx` will read from stdin, but there's a check added to make sure you aren't trying to read from a terminal. This check doesn't work on Windows, so if you just run `ofdmtvrx.exe` without arguments, it will do nothing (will look hanged). A message will be shown to indicate that it's not a bug. If this happens to you, just press Ctrl-C.
 
 If output directory is skipped, then `ofdmtvrx` will create files in current directory.
 
@@ -116,22 +116,27 @@ Another example, to save incoming stream while decoding and print peak incoming 
 
 If you figure an easy way to pipe input stream from sound card on Windows, please let me know. [Some suggestions](https://superuser.com/questions/1024792/is-there-a-windows-equivalent-to-the-linux-aplay-that-will-accept-a-bitstream).
 
+This MIGHT work (I didn't test it):
+
+`sox -d -e signed -b 16 -r 8k -c 1 - | ofdmtvrx`
+
+Or:
+
+`sox -t waveaudio 0 -e signed -b 16 -r 8k -c 1 - | ofdmtvrx`
+
 If you compiled the program with X support, but aren't running X (no DISPLAY set, etc.), add `-n` option. Otherwise the program will not run.
 
 If you're planning to do some weird things wih this program, know that it has to read the WAV file header before it does anything else (initializes the decoder, creates X windows, etc.). This is by design.
 
 ## How to test
 
-Here's a simple example for Linux that needs `yt-dlp` and `sox`. It uses a video created by SP5LOT to test COFDMTV reception.
+Here's a simple example for Linux that needs `yt-dlp`. It uses a video created by SP5LOT to test COFDMTV reception.
 
 ```
 yt-dlp -x --audio-format wav -o /tmp/test.wav https://www.youtube.com/watch?v=f8aWa8uixn8
-sox /tmp/test.wav -c 1 /tmp/test2.wav
 mkdir /tmp/testpictures
 ofdmtvrx -i /tmp/test2.wav -o /tmp/testpictures
 ```
-
-`sox` is used to convert channel count, and also to remove the extra chunk (LIST) added by yt-dlp / ffmpeg. My .wav decoder is very simple and doesn't handle these chunks (perhaps it could be made better one day, or decoding could be delegated to `sox` or something).
 
 ## X11 support
 
@@ -152,7 +157,6 @@ Window with last received image is *not* created – it's a TODO.
 * Input processing
   * Better sound level measurement (now it's only peak detection)
   * Print audio offset in seconds (useful for working with pre-recorded .wav files)
-  * Better .wav file handling (with LIST chunks), maybe delegated to `sox` or some library
 * Output file handling
   * Create output directory if it doesn't exist
   * Don't save files if output directory is not specified
