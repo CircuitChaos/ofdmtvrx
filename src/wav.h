@@ -28,6 +28,7 @@ private:
 	std::vector<uint8_t> m_rawBuffer;
 	bool m_close{false};
 	bool m_eof{false};
+	unsigned m_channels{0};
 
 	bool readHeader();
 };

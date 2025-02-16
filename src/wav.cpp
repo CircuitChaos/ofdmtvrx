@@ -24,8 +24,9 @@ Wav::Wav(const std::string &file)
 	if(!readHeader()) {
 		if(m_close) {
 			close(m_fd);
-			xthrow("WAV header error");
 		}
+
+		xthrow("WAV header error");
 	}
 }
 
@@ -121,8 +122,8 @@ bool Wav::readHeader()
 		return false;
 	}
 
-	if(h.numChannels != 1) {
-		loge("WAV has %u channels, but only mono files are supported", h.numChannels);
+	if(h.numChannels < 1 || h.numChannels > 8) {
+		loge("WAV has %u channels, doesn't make sense", h.numChannels);
 		return false;
 	}
 
@@ -146,8 +147,10 @@ bool Wav::readHeader()
 		return false;
 	}
 
-	m_rate = h.sampleRate;
-	logd("WAV sample rate: %u Hz", m_rate);
+	m_rate     = h.sampleRate;
+	m_channels = h.numChannels;
+
+	logd("WAV sample rate: %u Hz, %u channel(s)", m_rate, m_channels);
 	return true;
 }
 
@@ -168,17 +171,24 @@ bool Wav::isEOF() const
 
 bool Wav::getBuffer(std::vector<int16_t> &audioBuffer)
 {
-	if(m_rawBuffer.size() < audioBuffer.size() * 2) {
+	if(m_rawBuffer.size() < audioBuffer.size() * 2 * m_channels) {
 		return false;
 	}
 
 	for(size_t i(0); i != audioBuffer.size(); ++i) {
-		const uint16_t *le((const uint16_t *) &m_rawBuffer[i * 2]);
-		const uint16_t he(le16toh(*le));
-		memcpy(&audioBuffer[i], &he, 2);
+		int32_t sum(0);
+		for(size_t chan(0); chan < m_channels; ++chan) {
+			const uint16_t *le((const uint16_t *) &m_rawBuffer[(i * m_channels + chan) * 2]);
+			const uint16_t he(le16toh(*le));
+			int16_t heSigned;
+			memcpy(&heSigned, &he, 2);
+			sum += heSigned;
+		}
+
+		audioBuffer[i] = sum / m_channels;
 	}
 
-	m_rawBuffer.erase(m_rawBuffer.begin(), m_rawBuffer.begin() + audioBuffer.size() * 2);
+	m_rawBuffer.erase(m_rawBuffer.begin(), m_rawBuffer.begin() + audioBuffer.size() * 2 * m_channels);
 	return true;
 }
 
