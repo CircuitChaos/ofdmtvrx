@@ -76,8 +76,9 @@ static void Main(int argc, char *const argv[])
 
 	xassert(!cli.getInputFile().empty() || isatty(0) != 1, "Refusing to read samples from a terminal; use -h for help");
 	if(argc == 1) {
-		logn("Warning: program run without arguments. Reading from stdin. If that's");
-		logn("not what you want, press Ctrl-C and read the manual.");
+		logn("Warning: program run without arguments. Reading from");
+		logn("stdin. If that's not what you want, press Ctrl-C and");
+		logn("read the manual.");
 	}
 
 	Wav wav(cli.getInputFile());
